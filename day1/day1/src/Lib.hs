@@ -2,6 +2,8 @@ module Lib
     ( someFunc
     ) where
 
+import Data.List
+
 counter :: [Int] -> [Int]
 counter lst = counter' lst 0 []
 
@@ -16,7 +18,7 @@ someFunc :: IO ()
 
 someFunc = do
         contents <- readFile "input1.txt"
-        print . maximum . counter . map readInt . words $ contents
+        print . sum . take 3 . reverse . sort . counter . map readInt . words $ contents
 
 readInt :: String -> Int
 readInt = read
