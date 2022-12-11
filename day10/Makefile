@@ -1,4 +1,5 @@
 PROG = test1
+PROG2 = test2
 
 DEBUG ?= true
 
@@ -8,10 +9,11 @@ endif
 
 all: run
 
-run: prepare $(PROG)
+run: prepare $(PROG) $(PROG2)
 	time ./test1
+	time ./test2
 
-$(PROG): test1.o part1.o
+test%: test%.o part%.o
 	gcc $(CFLAGS) -o $@ $^
 
 test%.o: test%.c
@@ -24,4 +26,4 @@ prepare:
 	cat ./input.txt.orig | sed -E 's!noop!0!' | sed -E 's!addx (.*)!0\n\1!' > input.txt
 
 clean:
-	-rm -f *.o $(PROG) input.txt
+	-rm -f *.o $(PROG) $(PROG2) input.txt
