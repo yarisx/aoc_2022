@@ -1,0 +1,94 @@
+module Lib
+    ( someFunc,
+        sandgrain,
+        sandgrain'
+    ) where
+
+import Data.MultiMap
+import Data.List (find)
+import Data.List.Split
+import Data.List.Unique
+
+type Point = (Int, Int)
+type Line = (Point, Point)
+type PointMap = MultiMap Int Int
+type Slice = (Int, [Int])
+
+someFunc :: IO ()
+someFunc = do
+    contents <- readFile "../input.txt"
+    --print . Lib.show . expand_lines . Prelude.foldl parse [] . lines $ contents
+    --print . sandgrain . expand_lines 0 [] . expand_lines' . Prelude.foldl parse [] . lines $ contents
+    print . sandgrain . expand_lines 0 [] . expand_lines' . Prelude.foldl parse [] . lines $ contents
+    --print . expand_lines 0 [] . expand_lines' . Prelude.foldl parse [] . lines $ contents
+    --print . sandgrain $ [(2,[498,499,500,501,502])]
+
+-- does a set of linespecs from a string ("1,2 -> 3,4 -> 5,6" -> [((1,2),(3,4)), ((3,4),(5,6))]
+parse :: [Line] -> String -> [Line]
+parse acc ln = parse' acc . prep $ ln
+
+prep :: String -> [String]
+prep ln = filter f . splitOn " " $ ln
+    where f = \x -> x /= "->"
+
+parse' :: [Line] -> [String] -> [Line]
+parse' linespecs (s:e:ln)
+    | ln == [] = ((si, ei) : linespecs)
+    | otherwise = parse' ((si, ei) : linespecs) (e:ln)
+    where
+        pt (x : y : []) = (read x :: Int, read y :: Int)
+        si = pt . splitOn "," $ s
+        ei = pt . splitOn "," $ e
+
+-- it should be easier to produce slices when y-coord goes first
+expand_line :: PointMap -> Line -> PointMap
+expand_line expanded ((sx, sy), (ex, ey))
+    | sx == ex && sy > ey = expand_line expanded ((ex, ey), (sx, sy))
+    | sy == ey && sx > ex = expand_line expanded ((ex, ey), (sx, sy))
+    | sx == ex = Prelude.foldl (\a (y,x) -> insert y x a) expanded (zip y x)
+    | sy == ey = Prelude.foldl (\a (y,x) -> insert y x a) expanded (zip y' x')--((zip x' y' : expanded)
+    where
+        x = replicate (ey - sy + 1) sx
+        y = [sy..ey]
+        x' = [sx..ex]
+        y' = replicate (ex - sx + 1) sy
+
+
+fill_line c off = take (off * 2 + 1) [(c - off - 1) ..]
+
+expand_lines' = Prelude.map (\(x, l) -> (x, sortUniq l)) . Data.MultiMap.assocs . Prelude.foldl expand_line empty --linespecs
+expand_lines _ res [] = reverse ((167, (take (167*2 + 1) [(500-167-1)..])) : res)
+expand_lines min res prefill
+    | min < prefill_y = expand_lines (min + 1) ((min, []):res) prefill
+    | min == prefill_y = expand_lines (min + 1) (head prefill : res) . tail $ prefill
+    where
+        prefill_y = fst . head $ prefill
+
+show :: PointMap -> [(Int, [Int])]
+show m = Data.MultiMap.assocs m
+
+--sandgrain :: [Slice] -> Int
+sandgrain pm = sandgrain' pm (500,0) 0 []
+
+--sandgrain' :: [Slice] -> Point -> Int -> [Slice] -> Int
+--sandgrain' [] _ _ _ = [0]
+--sandgrain' (i:[]) _ cnt _ = [cnt]
+
+-- j is the _next_ slice, vpm are those that are checked, so the grain is -between- slices
+-- if the grain is stuck then topmost/last from the checked is updated with the grains position
+
+sandgrain' [] _ cnt _vpm = cnt
+sandgrain' (j:slices) (gx, gy) cnt vpm
+    | nextx /= Nothing = sandgrain' slices (fromMaybe (-1) nextx, gy + 1) cnt (j:vpm)
+    -- | otherwise = newslices --sandgrain' newslices (500, 0) (cnt + 1) []
+    | otherwise = sandgrain' newslices (500, 0) (cnt + 1) []
+    where
+        nextx = find (\x -> not (elem x jxs)) [gx, (gx - 1), (gx + 1)]
+        newslices = reverse (blocked: tail vpm) ++ (j:slices)
+        blocked = (iy, (gx:ixs))
+        (iy, ixs) = head vpm
+        (jy, jxs) = j
+
+fromMaybe :: a -> Maybe a -> a
+fromMaybe def Nothing = def
+fromMaybe _ (Just a) = a

@@ -1,0 +1,99 @@
+module Lib
+    ( someFunc,
+        sandgrain,
+        sandgrain'
+    ) where
+
+import Data.MultiMap
+import Data.List.Split
+import Data.List.Unique
+
+type Point = (Int, Int)
+type Line = (Point, Point)
+type PointMap = MultiMap Int Int
+type Slice = (Int, [Int])
+
+someFunc :: IO ()
+someFunc = do
+    contents <- readFile "../input.txt"
+    --print . Lib.show . expand_lines . Prelude.foldl parse [] . lines $ contents
+    print . sandgrain . expand_lines . Prelude.foldl parse [] . lines $ contents
+    --print . sandgrain $ [(2,[498,499,500,501,502])]
+
+-- does a set of linespecs from a string ("1,2 -> 3,4 -> 5,6" -> [((1,2),(3,4)), ((3,4),(5,6))]
+parse :: [Line] -> String -> [Line]
+parse acc ln = parse' acc . prep $ ln
+
+prep :: String -> [String]
+prep ln = filter f . splitOn " " $ ln
+    where f = \x -> x /= "->"
+
+parse' :: [Line] -> [String] -> [Line]
+parse' linespecs (s:e:ln)
+    | ln == [] = ((si, ei) : linespecs)
+    | otherwise = parse' ((si, ei) : linespecs) (e:ln)
+    where
+        pt (x : y : []) = (read x :: Int, read y :: Int)
+        si = pt . splitOn "," $ s
+        ei = pt . splitOn "," $ e
+
+-- it should be easier to produce slices when y-coord goes first
+expand_line :: PointMap -> Line -> PointMap
+expand_line expanded ((sx, sy), (ex, ey))
+    | sx == ex && sy > ey = expand_line expanded ((ex, ey), (sx, sy))
+    | sy == ey && sx > ex = expand_line expanded ((ex, ey), (sx, sy))
+    | sx == ex = Prelude.foldl (\a (y,x) -> insert y x a) expanded (zip y x)
+    | sy == ey = Prelude.foldl (\a (y,x) -> insert y x a) expanded (zip y' x')--((zip x' y' : expanded)
+    where
+        x = replicate (ey - sy + 1) sx
+        y = [sy..ey]
+        x' = [sx..ex]
+        y' = replicate (ex - sx + 1) sy
+
+expand_lines = Prelude.map (\(x, l) -> (x, sortUniq l)) . Data.MultiMap.assocs . Prelude.foldl expand_line empty --linespecs
+
+show :: PointMap -> [(Int, [Int])]
+show m = Data.MultiMap.assocs m
+
+--sandgrain :: [Slice] -> Int
+sandgrain pm = sandgrain' ((0,[]):pm) (500,0) 0 []
+
+--sandgrain' :: [Slice] -> Point -> Int -> [Slice] -> Int
+--sandgrain' [] _ _ _ = [0]
+--sandgrain' (i:[]) _ cnt _ = [cnt]
+
+-- j is the _next_ slice, vpm are those that are checked, so the grain is -between- slices
+-- if the grain is stuck then topmost/last from the checked is updated with the grains position - BUG!! here one needs to check if that line contained any blocked points at all!!!
+
+sandgrain' [] _ _ _ = 0
+sandgrain' (i:[]) _ cnt _ = cnt
+sandgrain' (j:slices) (gx, gy) cnt vpm
+    | (jy > gy + 1) = sandgrain' slices (gx, jy - 1) cnt vpm                    -- drop the grain on the floor
+    -- | not (elem gx jxs) = sandgrain' slices (gx, gy + 1) cnt (j:vpm)            -- it rolls down...
+    -- | not (elem (gx - 1) jxs) = sandgrain' slices (gx - 1, gy + 1) cnt (j:vpm)  -- or left..
+    -- | not (elem (gx + 1) jxs) = sandgrain' slices (gx + 1, gy + 1) cnt (j:vpm)  -- or right
+    | next /= Nothing = sandgrain' slices (nextx, gy + 1) cnt (j:vpm)
+    | gy < 9 = if gy == iy then cont newslices else cont newslices' --sandgrain' newslices (500, 0) (cnt + 1) []                -- blocked
+    | otherwise = cnt
+    where
+        nextx = find (\x -> not (elem x jxs)) [gx, (gx - 1), (gx + 1)]
+        newslices = reverse (blocked:vpm) ++ slices--(reverse ((iy, (gx:ixs)):vpm)) ++ slices
+        newslices' = reverse ((gy, [gx]):vpm) ++ slices
+        blocked = (gy, (gx:ixs))
+        (iy, ixs) = head vpm
+        (jy, jxs) = j
+        cont x = sandgrain' x (500, 0) (cnt + 1) []
+
+
+
+    --if (jy > gy + 1) then sandgrain' (i:slices) (gx, jy - 1) cnt vpm
+    --else
+    --    if (elem gx jxs) then
+    --        if (elem (gx - 1) jxs) then
+             --   if (elem (gx + 1) jxs) then
+    --                if gy > 0 then sandgrain' newslices (500, 0) (cnt + 1) [] --blocked
+     --               else -1
+                --else sandgrain' slices (gx + 1, gy + 1) cnt (i:vpm)
+            --else sandgrain' slices (gx - 1, gy + 1) cnt (i:vpm)
+        --else sandgrain' slices (gx, gy + 1) cnt (i:vpm)
+
