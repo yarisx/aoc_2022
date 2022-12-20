@@ -4,6 +4,8 @@
 
 #define container_of(ptr, type, member) ((type *)((char *)(1 ? (ptr) : &((type *)0)->member) - offsetof(type, member)))
 
+#define MULTIPLIER  811589153
+
 struct llnode;
 
 typedef struct llnode {
@@ -14,7 +16,8 @@ typedef struct llnode {
 typedef struct {
     llnode_t order;
     llnode_t place;
-    int32_t val;
+    int64_t true_val;
+    int64_t val;
 } num_t;
 
 void move_val(llnode_t *);
@@ -24,17 +27,23 @@ int main(void)
 {
     num_t *pend = calloc(1, sizeof(num_t));
     num_t *pstart = pend, *ntmp, *pzero;
-    int tmp, sum = 0;
+    int64_t tmp, sum = 0;
     FILE *f = fopen("input.txt", "r");
 
     while (!feof(f))
     {
-        if(1 > fscanf(f, "%d\n", &tmp))
+        if(1 > fscanf(f, "%lld\n", &tmp))
         {
             fprintf(stderr, "Failed to read the number\n");
             return -1;
         }
+#ifdef PART2
+        pend->val = (tmp * MULTIPLIER) % 4999;
+        pend->true_val = tmp * MULTIPLIER;
+#else
         pend->val = tmp;
+        pend->true_val = tmp;
+#endif
         if (0 == pend->val) pzero = pend;
 
         ntmp = calloc(1, sizeof(num_t));
@@ -49,6 +58,9 @@ int main(void)
     pend->place.prev->next = &pstart->place;
     pstart->place.prev = pend->place.prev;
 
+#ifdef PART2
+    for (int i = 0; i < 10; i++)
+#endif
     for (llnode_t *op = &pstart->order; op; op = op->next)
     {
         move_val(op);
@@ -58,7 +70,8 @@ int main(void)
     for (llnode_t *op = &pstart->place; op; op = op->next)
     {
         num_t *tmp = container_of(op, num_t, place);
-        printf("node addr: %p, place addr %p, op %p, num %d\n", tmp, &tmp->place, op, tmp->val);
+        printf("node addr: %p, place addr %p, op %p, val %lld, true_val %lld\n",
+               tmp, &tmp->place, op, tmp->val, tmp->true_val);
     }
 #endif
     tmp = 0;
@@ -67,11 +80,11 @@ int main(void)
         if (tmp == 1000 || tmp == 2000 || tmp == 3000)
         {
             num_t *ptmp = container_of(op, num_t, place);
-            sum += ptmp->val;
+            sum += ptmp->true_val;
         }
         tmp++;
     }
-    printf("Sum is %d\n", sum);
+    printf("Sum is %lld\n", sum);
     return 0;
 }
 

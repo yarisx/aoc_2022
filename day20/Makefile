@@ -1,12 +1,24 @@
 PROG    = part1
-PROG2   = part2
 
 ifneq ($(DEBUG),)
     CFLAGS += -g -gdwarf-4 -O0
 endif
 
-all: $(PROG) $(PROG2)
-	$(PROG) $(PROG2)
+ifneq ($(PART2),)
+    CFLAGS += -DPART2
+endif
+
+all: dopart1 dopart2
+
+dopart1:
+	$(MAKE) clean
+	$(MAKE) part1
+	./part1
+
+dopart2:
+	$(MAKE) clean
+	PART2=true $(MAKE) part1
+	./part1
 
 part%: part%.c
 	$(CC) $(CFLAGS) -o $@ $<
